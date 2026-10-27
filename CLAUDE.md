@@ -1,0 +1,69 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+Fontes de verdade: `docs/context.md` (produto, escopo da v1, backlog), `docs/architecture.md` (stack e decisões), `docs/instructions.md` (como trabalhar).
+
+## O projeto
+
+EasyBeat: mesa de DJ no navegador para iniciantes — beats em loop trocados ao vivo no tempo certo, com samples e efeitos por cima. Uso pessoal e local. Também serve como teste do **OpenSpec** (SDD).
+
+**Meta: v1 funcional até quinta, 29/10/2026.** Diante de risco de prazo, corta-se escopo, não se estende a data.
+
+## Como trabalhar
+
+- **Responder em português**, de forma direta e curta.
+- **SDD com OpenSpec é obrigatório:** nenhuma implementação sem change/spec aprovada. Fluxo: proposal + tasks + deltas de spec → aprovação → implementar → arquivar a change atualizando as specs. Uma capacidade por change.
+- OpenSpec 1.15 (CLI global `openspec`) já inicializado: `openspec/` (specs, changes, `config.yaml` em pt-BR) e comandos `/opsx:propose`, `/opsx:explore`, `/opsx:apply`, `/opsx:update`, `/opsx:sync`, `/opsx:archive` em `.claude/`. `openspec list` / `openspec validate` no terminal.
+- Registrar o que funcionou/atrapalhou no processo OpenSpec (é um objetivo do projeto).
+- Ideias fora da v1 vão para o backlog em `docs/context.md`, não para a change atual. Avisar quando algo estiver fora do escopo ou for inviável no navegador.
+- Sempre pensar na experiência de um iniciante usando o teclado.
+
+### Plano de changes (ordem)
+1. `setup-stack` 2. `beat-slots` 3. `sample-pads` 4. `keyboard-shortcuts` 5. `fx-basicos` 6. `persistencia-minima`
+Ordem de corte se o prazo apertar: 5, depois 6.
+
+## Stack
+
+SPA **TypeScript + Vite + React**, áudio com **Tone.js**, banco local **IndexedDB via Dexie**. **Sem backend** (Node/Fastify/SQLite foi descartado). Testes com **Vitest**, só para lógica pura (quantização, cálculo de BPM, mapa de teclas). Lint com **oxlint** (veio no template do Vite). Navegador alvo: Chrome/Edge. Poucas dependências.
+
+```bash
+npm run dev                                   # servidor Vite
+npm run build                                 # tsc -b + vite build
+npm test                                      # vitest run
+npx vitest run src/input/keymap.test.ts -t "Espaço"   # um teste só
+npm run lint                                  # oxlint
+```
+
+## Arquitetura
+
+`src/main.tsx` instala o listener de teclado uma única vez (fora do React) e renderiza `ui/App`.
+
+```
+src/
+  engine/    Tone.js: relógio, slots de beat, pads, FX — não conhece React; expõe comandos e emite eventos
+  commands/  ações nomeadas: switchBeat(n), triggerSample(n), toggleFx(x), stop()...
+  input/     teclado e mouse → commands (um único listener de keydown)
+  ui/        React; lê estado do engine via useSyncExternalStore
+  storage/   repositório Dexie
+```
+
+Princípios que atravessam módulos:
+- **Motor independente da UI:** estado de áudio fica fora do state do React; rerender nunca pode atrasar o som.
+- **Teclado e mouse disparam os mesmos commands** — remapear teclas no futuro deve ser só trocar a tabela tecla→comando.
+- **Teclas por `event.code`** (posição física; funciona igual no ABNT2); ignorar `event.repeat`.
+- **Tudo quantizado pelo Transport:** trocas de beat agendadas para o próximo compasso (ou 4/8) — o som nunca "atravessa".
+- **Áudio decodificado ao carregar, não ao tocar.**
+
+Limitações aceitas na v1:
+- Sem detecção de BPM: o usuário informa se o loop tem 4 ou 8 compassos; BPM vem da duração.
+- Sem time-stretch: o primeiro beat define o BPM; beats com BPM diferente geram aviso.
+- Áudio só inicia após gesto do usuário (tela "Pressione Espaço para começar").
+
+Mapa de teclas inicial: `1`–`8` slots de beat, `Q W E R` / `A S D F` pads, `Espaço` play/stop (final definido em `keyboard-shortcuts`).
+
+## Restrições da v1
+
+- Sem login/usuário. Persistência mínima só em banco local; cada coisa nova a salvar entra por change própria.
+- O usuário carrega os próprios áudios; arquivos de áudio ficam **fora do repositório** (`.gitignore`).
+- Não usar marcas de terceiros (Podpah, BASE) no nome ou identidade do produto.

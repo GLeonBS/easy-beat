@@ -1,0 +1,54 @@
+schema: spec-driven
+
+context: |
+  Language: pt-BR
+  All artifacts must be written in pt-BR.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Projeto: EasyBeat, mesa de DJ no navegador para iniciantes (beats em loop trocados
+  no tempo certo, samples e efeitos por cima). Uso pessoal e local. v1 até 29/10/2026;
+  diante de risco de prazo, cortar escopo.
+
+  Stack: SPA TypeScript + Vite + React; áudio com Tone.js; banco local IndexedDB via
+  Dexie; sem backend. Testes com Vitest só para lógica pura. Lint: oxlint.
+  Navegador alvo: Chrome/Edge.
+
+  Estrutura (src/):
+  - engine/: motor de áudio Tone.js, sem React; expõe comandos e emite estado
+  - commands/: ações nomeadas (start, switchBeat, triggerSample...)
+  - input/: único listener de keydown; mapa event.code -> comando
+  - ui/: React; lê o engine via useSyncExternalStore
+  - storage/: repositório Dexie
+
+  Princípios:
+  - Estado de áudio fora do React; rerender nunca atrasa o som.
+  - Teclado e mouse disparam os mesmos comandos; toda ação acessível pelo teclado.
+  - Teclas por event.code (posição física, ABNT2); ignorar event.repeat.
+  - Trocas de beat e samples quantizadas pelo Transport; o som nunca "atravessa".
+  - Áudios decodificados ao carregar, não ao tocar.
+
+  Restrições da v1: sem login/usuário; persistência mínima, cada dado novo por change
+  própria; sem detecção de BPM nem time-stretch; áudio só após gesto do usuário;
+  arquivos de áudio fora do repositório; linguagem simples para iniciantes.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
