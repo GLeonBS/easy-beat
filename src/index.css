@@ -118,6 +118,15 @@ button {
   color: #bbb;
 }
 
+.pad-vazio {
+  opacity: 0.6;
+}
+
+.pad-tocando {
+  border-color: #64b5f6;
+  background: #1f2a36;
+}
+
 .slot-na-fila {
   border-color: #ffb74d;
   border-style: dashed;

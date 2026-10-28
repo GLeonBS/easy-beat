@@ -23,11 +23,22 @@ export function deckName(deck: number): string {
   return deck === 0 ? 'A' : 'B'
 }
 
-// Slots do deck livres para receber arquivo: sem beat e sem carregamento em andamento.
-export function emptySlotsOfDeck(slots: readonly unknown[], loading: readonly boolean[], deck: number): number[] {
-  const first = deck * SLOTS_PER_DECK
-  return Array.from({ length: SLOTS_PER_DECK }, (_, offset) => first + offset).filter(
-    (slot) => !slots[slot] && !loading[slot],
+export const PAD_COUNT = 8
+export const PAD_LETTERS = 'QWERASDF'
+
+export function padName(pad: number): string {
+  return PAD_LETTERS[pad]
+}
+
+// Posições livres para receber arquivo no intervalo [first, first + count): sem áudio e sem carregamento em andamento.
+export function emptyIndices(
+  items: readonly unknown[],
+  loading: readonly boolean[],
+  first: number,
+  count: number,
+): number[] {
+  return Array.from({ length: count }, (_, offset) => first + offset).filter(
+    (index) => !items[index] && !loading[index],
   )
 }
 

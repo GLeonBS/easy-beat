@@ -1,7 +1,7 @@
 import { useRef } from 'react'
-import { commands } from '../commands'
 
-export function DeckLoadButton({ deck }: { deck: number }) {
+// Botão "Carregar vários": abre o seletor com múltiplos arquivos de áudio.
+export function LoadManyButton({ onFiles }: { onFiles: (files: File[]) => void }) {
   const fileInput = useRef<HTMLInputElement>(null)
 
   return (
@@ -18,7 +18,7 @@ export function DeckLoadButton({ deck }: { deck: number }) {
         onChange={(event) => {
           const files = Array.from(event.target.files ?? [])
           event.target.value = ''
-          if (files.length > 0) void commands.loadDeck(deck, files)
+          if (files.length > 0) onFiles(files)
         }}
       />
     </>

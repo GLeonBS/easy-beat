@@ -15,9 +15,17 @@ describe('resolveCommand', () => {
     expect(resolveCommand('Numpad5', false)).toEqual(resolveCommand('Digit5', false))
   })
 
+  it('mapeia Q W E R / A S D F para os pads 0–7', () => {
+    expect(resolveCommand('KeyQ', false)).toEqual({ type: 'triggerPad', pad: 0 })
+    expect(resolveCommand('KeyR', false)).toEqual({ type: 'triggerPad', pad: 3 })
+    expect(resolveCommand('KeyA', false)).toEqual({ type: 'triggerPad', pad: 4 })
+    expect(resolveCommand('KeyF', false)).toEqual({ type: 'triggerPad', pad: 7 })
+  })
+
   it('ignora tecla segurada', () => {
     expect(resolveCommand('Space', true)).toBeNull()
     expect(resolveCommand('Digit2', true)).toBeNull()
+    expect(resolveCommand('KeyD', true)).toBeNull()
   })
 
   it('ignora teclas sem comando', () => {

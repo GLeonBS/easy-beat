@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeBpm, deckOf, emptySlotsOfDeck, isBpmCompatible, slotsToPlay } from './tempo'
+import { computeBpm, deckOf, emptyIndices, isBpmCompatible, slotsToPlay } from './tempo'
 
 describe('computeBpm', () => {
   it('8 s com 4 compassos = 120 BPM', () => {
@@ -28,21 +28,25 @@ describe('deckOf', () => {
   })
 })
 
-describe('emptySlotsOfDeck', () => {
+describe('emptyIndices', () => {
   const beat = { fileName: 'a.wav' }
   const slots = [null, beat, null, null, beat, beat, beat, null]
   const loading = [false, false, false, true, false, false, false, false]
 
   it('lista os slots vazios do Deck A em ordem, sem os que estão carregando', () => {
-    expect(emptySlotsOfDeck(slots, loading, 0)).toEqual([0, 2])
+    expect(emptyIndices(slots, loading, 0, 4)).toEqual([0, 2])
   })
 
   it('lista os slots vazios do Deck B', () => {
-    expect(emptySlotsOfDeck(slots, loading, 1)).toEqual([7])
+    expect(emptyIndices(slots, loading, 4, 4)).toEqual([7])
   })
 
-  it('retorna vazio com o deck cheio', () => {
-    expect(emptySlotsOfDeck([beat, beat, beat, beat], [false, false, false, false], 0)).toEqual([])
+  it('lista os pads vazios em ordem nos 8 pads', () => {
+    expect(emptyIndices(slots, loading, 0, 8)).toEqual([0, 2, 7])
+  })
+
+  it('retorna vazio com tudo cheio', () => {
+    expect(emptyIndices([beat, beat, beat, beat], [false, false, false, false], 0, 4)).toEqual([])
   })
 })
 

@@ -1,5 +1,17 @@
 import * as Tone from 'tone'
-import { BEATS_PER_BAR, computeBpm, DECK_COUNT, deckName, deckOf, emptySlotsOfDeck, SLOT_COUNT, slotsToPlay } from './tempo'
+import {
+  BEATS_PER_BAR,
+  computeBpm,
+  DECK_COUNT,
+  deckName,
+  deckOf,
+  emptyIndices,
+  PAD_COUNT,
+  padName,
+  SLOT_COUNT,
+  SLOTS_PER_DECK,
+  slotsToPlay,
+} from './tempo'
 
 // Motor de áudio: não conhece React. A UI lê o estado via subscribe/getState.
 export type EngineStatus = 'idle' | 'starting' | 'ready' | 'error'
@@ -25,6 +37,9 @@ export interface EngineState {
   slots: readonly (BeatFile | null)[]
   bars: readonly Bars[]
   loading: readonly boolean[]
+  pads: readonly (BeatFile | null)[]
+  padLoading: readonly boolean[]
+  padPlaying: readonly boolean[]
   message: string | null
 }
 
@@ -38,12 +53,16 @@ let state: EngineState = {
   slots: Array(SLOT_COUNT).fill(null),
   bars: Array(SLOT_COUNT).fill(4),
   loading: Array(SLOT_COUNT).fill(false),
+  pads: Array(PAD_COUNT).fill(null),
+  padLoading: Array(PAD_COUNT).fill(false),
+  padPlaying: Array(PAD_COUNT).fill(false),
   message: null,
 }
 const listeners = new Set<() => void>()
 
 // Fora do estado: objetos do Tone.js e o que o relógio de áudio já decidiu, por deck.
 const players: (Tone.Player | null)[] = Array(SLOT_COUNT).fill(null)
+const padPlayers: (Tone.Player | null)[] = Array(PAD_COUNT).fill(null)
 const activeSlots: (number | null)[] = Array(DECK_COUNT).fill(null)
 const switchEventIds: (number | null)[] = Array(DECK_COUNT).fill(null)
 let referenceSlot: number | null = null
@@ -70,6 +89,32 @@ function deckBpm(slots: EngineState['slots'], bars: EngineState['bars']): number
 
 function applyBpm(bpm: number | null) {
   if (bpm !== null) Tone.getTransport().bpm.value = bpm
+}
+
+function decodeFile(file: File): Promise<AudioBuffer> {
+  return file.arrayBuffer().then((data) => Tone.getContext().decodeAudioData(data))
+}
+
+// Carrega arquivos nas posições livres, um por vez, e devolve o resumo: arquivos ilegíveis primeiro, depois os que não couberam.
+async function loadInto(
+  free: number[],
+  files: File[],
+  load: (index: number, file: File) => Promise<boolean>,
+  where: string,
+): Promise<string | null> {
+  const failed: string[] = []
+  for (const [i, file] of files.slice(0, free.length).entries()) {
+    if (!(await load(free[i], file))) failed.push(file.name)
+  }
+  const notes: string[] = []
+  if (failed.length > 0) notes.push(`Não foi possível ler: ${failed.join(', ')}`)
+  const skipped = files.length - free.length
+  if (skipped > 0) notes.push(`${skipped === 1 ? '1 arquivo não coube' : `${skipped} arquivos não couberam`} ${where}`)
+  return notes.length > 0 ? notes.join('. ') : null
+}
+
+function markLoading(loading: readonly boolean[], indices: number[]): boolean[] {
+  return loading.map((value, index) => value || indices.includes(index))
 }
 
 function cancelSwitch(deck: number) {
@@ -99,9 +144,11 @@ function stop() {
   Tone.getDraw().cancel(0)
   Tone.getTransport().stop()
   players.forEach((player) => player?.stop())
+  padPlayers.forEach((player) => player?.stop())
   activeSlots.fill(null)
   setState({
     playing: false,
+    padPlaying: state.padPlaying.map(() => false),
     decks: state.decks.map((deck) => ({ ...deck, current: null, queued: null })),
     message: null,
   })
@@ -182,7 +229,7 @@ export const engine = {
     if (state.playing && activeSlots.includes(slot)) return false
     setState({ loading: replaceAt(state.loading, slot, true), message: null })
     try {
-      const buffer = await Tone.getContext().decodeAudioData(await file.arrayBuffer())
+      const buffer = await decodeFile(file)
       const player = new Tone.Player(buffer).toDestination()
       player.loop = true
       players[slot]?.dispose()
@@ -205,24 +252,62 @@ export const engine = {
 
   // Preenche os slots vazios do deck em ordem, um arquivo por vez (o primeiro define o BPM da mesa).
   async loadDeck(deck: number, files: File[]): Promise<void> {
-    const free = emptySlotsOfDeck(state.slots, state.loading, deck)
+    const free = emptyIndices(state.slots, state.loading, deck * SLOTS_PER_DECK, SLOTS_PER_DECK)
     if (free.length === 0) return setState({ message: `O Deck ${deckName(deck)} está cheio` })
-    const accepted = files.slice(0, free.length)
-    let loading = state.loading
-    for (const slot of free.slice(0, accepted.length)) loading = replaceAt(loading, slot, true)
-    setState({ loading, message: null })
-    const failed: string[] = []
-    for (const [i, file] of accepted.entries()) {
-      if (!(await engine.loadSlot(free[i], file))) failed.push(file.name)
+    setState({ loading: markLoading(state.loading, free.slice(0, files.length)), message: null })
+    // Cada loadSlot limpa a mensagem; o resumo vem no fim.
+    const summary = await loadInto(free, files, engine.loadSlot, `no Deck ${deckName(deck)}`)
+    if (summary) setState({ message: summary })
+  },
+
+  async loadPad(pad: number, file: File): Promise<boolean> {
+    setState({ padLoading: replaceAt(state.padLoading, pad, true), message: null })
+    try {
+      const buffer = await decodeFile(file)
+      const player = new Tone.Player(buffer).toDestination()
+      // onstop dispara também para a fonte cortada por restart; só apaga o indicador se o pad parou de fato.
+      player.onstop = () => {
+        setTimeout(() => {
+          if (padPlayers[pad] === player && player.state === 'stopped') {
+            setState({ padPlaying: replaceAt(state.padPlaying, pad, false) })
+          }
+        }, 0)
+      }
+      padPlayers[pad]?.dispose()
+      padPlayers[pad] = player
+      setState({
+        pads: replaceAt(state.pads, pad, { fileName: file.name, duration: buffer.duration }),
+        padLoading: replaceAt(state.padLoading, pad, false),
+        padPlaying: replaceAt(state.padPlaying, pad, false),
+      })
+      return true
+    } catch {
+      setState({
+        padLoading: replaceAt(state.padLoading, pad, false),
+        message: `Não foi possível ler o arquivo "${file.name}"`,
+      })
+      return false
     }
-    // Cada loadSlot limpa a mensagem; o resumo vem no fim, com erro de arquivo na frente.
-    const notes: string[] = []
-    if (failed.length > 0) notes.push(`Não foi possível ler: ${failed.join(', ')}`)
-    const skipped = files.length - accepted.length
-    if (skipped > 0) {
-      notes.push(`${skipped === 1 ? '1 arquivo não coube' : `${skipped} arquivos não couberam`} no Deck ${deckName(deck)}`)
-    }
-    if (notes.length > 0) setState({ message: notes.join('. ') })
+  },
+
+  // Preenche os pads vazios em ordem (Q W E R A S D F), um arquivo por vez.
+  async loadPads(files: File[]): Promise<void> {
+    const free = emptyIndices(state.pads, state.padLoading, 0, PAD_COUNT)
+    if (free.length === 0) return setState({ message: 'Os pads estão cheios' })
+    setState({ padLoading: markLoading(state.padLoading, free.slice(0, files.length)), message: null })
+    const summary = await loadInto(free, files, engine.loadPad, 'nos pads')
+    if (summary) setState({ message: summary })
+  },
+
+  // Toca na hora, sem quantizar; repetir o pad reinicia o sample.
+  triggerPad(pad: number) {
+    if (state.status !== 'ready') return
+    const player = padPlayers[pad]
+    if (!player) return setState({ message: `O pad ${padName(pad)} está vazio` })
+    const now = Tone.now()
+    if (player.state === 'started') player.restart(now)
+    else player.start(now)
+    setState({ padPlaying: replaceAt(state.padPlaying, pad, true), message: null })
   },
 
   setBars(slot: number, value: Bars) {
