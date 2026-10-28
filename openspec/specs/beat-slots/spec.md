@@ -1,7 +1,7 @@
 # beat-slots Specification
 
 ## Purpose
-Permite carregar loops de beat em slots numerados e trocar entre eles ao vivo, sempre no tempo musical certo, para servir de base contínua a quem está rimando.
+Permite carregar loops de beat em slots numerados e trocar entre eles ao vivo, na hora, com o tempo controlado pelo ouvido do DJ, para servir de base contínua a quem está rimando.
 
 ## Requirements
 

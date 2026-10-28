@@ -12,9 +12,9 @@ SPA em **TypeScript + Vite + React**, com motor de áudio em **Tone.js** (Web Au
 | Linguagem | TypeScript | Tipos ajudam specs e código gerado |
 | Build/dev | Vite | Sobe com `npm run dev`, zero config |
 | UI | React | Ecossistema conhecido; UI simples |
-| Áudio | Tone.js | Relógio musical (Transport), agendamento quantizado, players e efeitos prontos |
+| Áudio | Tone.js | Players e efeitos prontos, relógio de áudio preciso |
 | Banco local | IndexedDB + Dexie | Banco local no navegador; guarda áudios como Blob; sem servidor |
-| Testes | Vitest | Apenas lógica pura (quantização, cálculo de BPM, mapa de teclas) |
+| Testes | Vitest | Apenas lógica pura (cálculo de BPM, mapa de teclas) |
 | Navegador alvo | Chrome/Edge | Menor latência de áudio; compatível com Keyboard Lock (backlog) |
  
 ### Alternativa descartada
@@ -36,14 +36,14 @@ src/
 - **Motor independente da UI:** estado de áudio fora do state do React; rerender nunca atrasa o som.
 - **Teclado e mouse disparam os mesmos comandos:** garante "toda ação pelo teclado" e deixa o remapeamento futuro barato (só trocar a tabela tecla→comando).
 - **Teclas por `event.code`** (posição física, funciona igual no ABNT2); ignorar `event.repeat`.
-- **Tudo quantizado pelo Transport:** trocas de beat são agendadas para o próximo compasso (ou 4/8) — o som nunca "atravessa".
+- **Tudo na hora:** beats entram, trocam e saem no instante do comando, do início do loop; pads idem. Sem quantização — o tempo é do DJ, no ouvido. (Revisado em 27/10/2026, change `beats-imediatos`; a versão aprovada previa quantizar pelo Transport.)
 - **Áudios decodificados ao carregar,** não ao tocar — pads respondem na hora.
 ## Limitações do navegador (decisões da v1)
 1. **Sem detecção automática de BPM.** O usuário informa quantos compassos o loop tem (4 ou 8); o BPM é calculado pela duração.
 2. **Sem time-stretch.** O primeiro beat define o BPM; beats com BPM diferente geram aviso. (Backlog.)
 3. **Áudio só inicia após gesto do usuário.** Tela inicial: "Pressione Espaço para começar".
 ## Mapa de teclas padrão (proposta inicial)
-- `1`–`8`: slots de beat (troca quantizada)
+- `1`–`8`: slots de beat (troca na hora)
 - `Q W E R` / `A S D F`: pads de sample
 - `Espaço`: play/stop
 - Detalhes finais definidos na change `keyboard-shortcuts`.

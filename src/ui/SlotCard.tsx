@@ -9,8 +9,7 @@ const BAR_OPTIONS: Bars[] = [4, 8]
 function slotStatus(index: number, state: EngineState): string {
   const deck = state.decks[deckOf(index)]
   if (state.loading[index]) return 'carregando…'
-  if (state.playing && deck.current === index) return deck.queued === 'stop' ? 'saindo' : 'tocando'
-  if (deck.queued === index) return 'na fila'
+  if (state.playing && deck.current === index) return 'tocando'
   return state.slots[index] ? 'pronto' : 'vazio'
 }
 
@@ -24,7 +23,7 @@ export function SlotCard({ index, state }: { index: number; state: EngineState }
   const isPlaying = state.playing && state.decks[deckOf(index)].current === index
 
   return (
-    <section className={`slot slot-${status.replace('…', '').replace(' ', '-')}`} onClick={() => commands.selectSlot(index)}>
+    <section className={`slot slot-${status.replace('…', '')}`} onClick={() => commands.selectSlot(index)}>
       <header className="slot-header">
         <kbd>{index + 1}</kbd>
         <span className="slot-status">{status}</span>

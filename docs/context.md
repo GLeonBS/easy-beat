@@ -30,7 +30,7 @@ Inspiração: o estilo de performance do DJ Mu540 no programa BASE — beats con
 ## Princípios do produto (direção de longo prazo)
 - **Público iniciante:** linguagem simples, interface didática.
 - **Teclado em primeiro lugar:** toda ação possível pelo teclado; mouse continua funcionando.
-- **O som nunca "atravessa":** trocas de beat e entradas de sample acontecem no tempo musical certo.
+- **Tudo entra na hora; o tempo é do DJ:** trocas de beat e samples respondem no instante do comando, do início do som. A mesa não corrige o tempo — acertar no ouvido é a habilidade que o iniciante pratica (o modo aprendizado futuro pode ajudar nisso).
 - **Modo aprendizado** (futuro): ensinar a contar tempos e compassos (4/8/16), achar o "1" e saber quando trocar o beat ou soltar um efeito.
 - **Proteção de atalhos** (futuro, com degradação elegante): atalhos comuns podem ser interceptados em qualquer navegador; Ctrl+W/Ctrl+T/Esc só com Fullscreen + Keyboard Lock API (Chrome/Edge); combinações do sistema (Ctrl+Alt+Del etc.) nunca. Sempre informar ao usuário o que está e o que não está protegido.
 ## Restrições

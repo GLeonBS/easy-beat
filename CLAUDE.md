@@ -25,7 +25,7 @@ Ordem de corte se o prazo apertar: 5, depois 6.
 
 ## Stack
 
-SPA **TypeScript + Vite + React**, áudio com **Tone.js**, banco local **IndexedDB via Dexie**. **Sem backend** (Node/Fastify/SQLite foi descartado). Testes com **Vitest**, só para lógica pura (quantização, cálculo de BPM, mapa de teclas). Lint com **oxlint** (veio no template do Vite). Navegador alvo: Chrome/Edge. Poucas dependências.
+SPA **TypeScript + Vite + React**, áudio com **Tone.js**, banco local **IndexedDB via Dexie**. **Sem backend** (Node/Fastify/SQLite foi descartado). Testes com **Vitest**, só para lógica pura (cálculo de BPM, mapa de teclas). Lint com **oxlint** (veio no template do Vite). Navegador alvo: Chrome/Edge. Poucas dependências.
 
 ```bash
 npm run dev                                   # servidor Vite
@@ -52,9 +52,9 @@ Princípios que atravessam módulos:
 - **Motor independente da UI:** estado de áudio fica fora do state do React; rerender nunca pode atrasar o som.
 - **Teclado e mouse disparam os mesmos commands** — remapear teclas no futuro deve ser só trocar a tabela tecla→comando.
 - **Teclas por `event.code`** (posição física; funciona igual no ABNT2); ignorar `event.repeat`.
-- **Tudo quantizado pelo Transport:** trocas de beat agendadas para o próximo compasso (ou 4/8) — o som nunca "atravessa".
+- **Tudo na hora, sem quantização:** beats entram, trocam e saem no instante do comando, do início do loop; pads idem. A mesa não alinha decks — o tempo é do DJ. O Transport não roda; só guarda o BPM da mesa (`transport.bpm`).
 - **Áudio decodificado ao carregar, não ao tocar.**
-- **Agendamento no Transport:** `scheduleOnce` recebe tempo do *Transport* (use ticks, ex. `'${n}i'`); `nextSubdivision()` devolve tempo do *contexto de áudio* — não misture. Trocas de som usam o `time` do callback; atualizações de tela vão por `Tone.getDraw().schedule(..., time)`.
+- **Trocas no mesmo instante:** use um único `now = Tone.now()` para o `stop` do beat anterior e o `start` do novo, para não haver silêncio nem sobreposição.
 
 Limitações aceitas na v1:
 - Sem detecção de BPM: o usuário informa se o loop tem 4 ou 8 compassos; BPM vem da duração.

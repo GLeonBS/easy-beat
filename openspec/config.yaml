@@ -24,7 +24,7 @@ context: |
   - Estado de áudio fora do React; rerender nunca atrasa o som.
   - Teclado e mouse disparam os mesmos comandos; toda ação acessível pelo teclado.
   - Teclas por event.code (posição física, ABNT2); ignorar event.repeat.
-  - Trocas de beat e samples quantizadas pelo Transport; o som nunca "atravessa".
+  - Tudo entra na hora, do início do som; sem quantização. O tempo é do DJ, no ouvido.
   - Áudios decodificados ao carregar, não ao tocar.
 
   Restrições da v1: sem login/usuário; persistência mínima, cada dado novo por change
