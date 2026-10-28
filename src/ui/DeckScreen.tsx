@@ -15,9 +15,20 @@ export function DeckScreen({ state }: { state: EngineState }) {
         <p className="deck-bpm">
           BPM da mesa: <strong>{state.bpm === null ? '—' : formatBpm(state.bpm)}</strong>
         </p>
-        <button type="button" onClick={() => void commands.togglePlay()}>
-          {state.playing ? 'Parar' : 'Tocar'} <kbd>Espaço</kbd>
-        </button>
+        <div className="deck-actions">
+          <button
+            type="button"
+            className="clear-deck"
+            onClick={() => {
+              if (window.confirm('Limpar a mesa? Os beats e samples salvos serão apagados.')) void commands.clearDeck()
+            }}
+          >
+            Limpar mesa
+          </button>
+          <button type="button" onClick={() => void commands.togglePlay()}>
+            {state.playing ? 'Parar' : 'Tocar'} <kbd>Espaço</kbd>
+          </button>
+        </div>
       </header>
       <p className="deck-message" role="status">
         {state.message}

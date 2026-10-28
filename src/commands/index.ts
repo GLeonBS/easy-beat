@@ -24,6 +24,7 @@ export const commands = {
   effectRelease: (deck: number, effect: EffectName) => engine.effectRelease(deck, effect),
   toggleEffectMode: (deck: number) => engine.toggleEffectMode(deck),
   releaseHeldEffects: () => engine.releaseHeldEffects(),
+  clearDeck: () => engine.clearDeck(),
 
   execute(command: Command) {
     switch (command.type) {

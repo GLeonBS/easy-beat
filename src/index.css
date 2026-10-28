@@ -60,6 +60,17 @@ button {
   margin-top: 0;
 }
 
+.deck-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.clear-deck {
+  background: transparent;
+  border: 1px solid #a33;
+  color: #ff8a80;
+}
+
 .deck-bpm {
   font-size: 1.2rem;
 }

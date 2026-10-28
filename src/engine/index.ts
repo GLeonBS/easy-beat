@@ -12,6 +12,8 @@ import {
   SLOTS_PER_DECK,
   slotsToPlay,
 } from './tempo'
+import { clearAll, deletePad, deleteSlot, loadSaved, savePad, saveSlot, saveSlotBars } from '../storage'
+import { restoreOrder } from '../storage/restore'
 
 // Motor de áudio: não conhece React. A UI lê o estado via subscribe/getState.
 export type EngineStatus = 'idle' | 'starting' | 'ready' | 'error'
@@ -144,7 +146,7 @@ function effectsOff(decks: readonly DeckState[], deck: number): DeckState[] {
   return setEffect(setEffect(decks, deck, 'filter', false), deck, 'echo', false)
 }
 
-function decodeFile(file: File): Promise<AudioBuffer> {
+function decodeFile(file: Blob): Promise<AudioBuffer> {
   return file.arrayBuffer().then((data) => Tone.getContext().decodeAudioData(data))
 }
 
@@ -188,6 +190,106 @@ function stopDecks(decks: readonly DeckState[]) {
   setState({ playing: false, decks: decks.map((deck) => ({ ...deck, current: null })), message: null })
 }
 
+// Falha no banco nunca impede tocar: só avisa que o áudio não volta na próxima sessão.
+function persist(write: Promise<void>, fileName: string) {
+  write.catch(() => setState({ message: `"${fileName}" não será lembrado na próxima vez` }))
+}
+
+interface LoadOptions {
+  bars?: Bars
+  // false ao restaurar: o áudio já está salvo.
+  persist: boolean
+}
+
+async function loadSlotFile(slot: number, source: Blob, fileName: string, options: LoadOptions): Promise<boolean> {
+  if (state.playing && state.decks.some((deck) => deck.current === slot)) return false
+  setState({ loading: replaceAt(state.loading, slot, true), message: null })
+  try {
+    const buffer = await decodeFile(source)
+    const player = new Tone.Player(buffer).connect(chains[deckOf(slot)].bus)
+    player.loop = true
+    players[slot]?.dispose()
+    players[slot] = player
+    if (referenceSlot === null) referenceSlot = slot
+    const slotBars = options.bars ?? 4
+    const slots = replaceAt(state.slots, slot, { fileName, duration: buffer.duration })
+    const bars = replaceAt(state.bars, slot, slotBars)
+    const bpm = deckBpm(slots, bars)
+    applyBpm(bpm)
+    setState({ slots, bars, bpm, loading: replaceAt(state.loading, slot, false) })
+    if (options.persist) {
+      persist(saveSlot({ index: slot, fileName, blob: source, bars: slotBars, savedAt: Date.now() }), fileName)
+    }
+    return true
+  } catch {
+    setState({
+      loading: replaceAt(state.loading, slot, false),
+      message: `Não foi possível ler o arquivo "${fileName}"`,
+    })
+    return false
+  }
+}
+
+async function loadPadFile(pad: number, source: Blob, fileName: string, options: LoadOptions): Promise<boolean> {
+  setState({ padLoading: replaceAt(state.padLoading, pad, true), message: null })
+  try {
+    const buffer = await decodeFile(source)
+    const player = new Tone.Player(buffer).toDestination()
+    // onstop dispara também para a fonte cortada por restart; só apaga o indicador se o pad parou de fato.
+    player.onstop = () => {
+      setTimeout(() => {
+        if (padPlayers[pad] === player && player.state === 'stopped') {
+          setState({ padPlaying: replaceAt(state.padPlaying, pad, false) })
+        }
+      }, 0)
+    }
+    padPlayers[pad]?.dispose()
+    padPlayers[pad] = player
+    setState({
+      pads: replaceAt(state.pads, pad, { fileName, duration: buffer.duration }),
+      padLoading: replaceAt(state.padLoading, pad, false),
+      padPlaying: replaceAt(state.padPlaying, pad, false),
+    })
+    if (options.persist) persist(savePad({ index: pad, fileName, blob: source, savedAt: Date.now() }), fileName)
+    return true
+  } catch {
+    setState({
+      padLoading: replaceAt(state.padLoading, pad, false),
+      message: `Não foi possível ler o arquivo "${fileName}"`,
+    })
+    return false
+  }
+}
+
+// Recarrega a mesa salva: slots na ordem original (o primeiro volta a definir o BPM), depois pads.
+async function restoreSaved() {
+  let saved: Awaited<ReturnType<typeof loadSaved>>
+  try {
+    saved = await loadSaved()
+  } catch {
+    return setState({ message: 'Não foi possível abrir a mesa salva' })
+  }
+  setState({
+    loading: markLoading(state.loading, saved.slots.map((record) => record.index)),
+    padLoading: markLoading(state.padLoading, saved.pads.map((record) => record.index)),
+  })
+  const failed: string[] = []
+  for (const record of restoreOrder(saved.slots)) {
+    const ok = await loadSlotFile(record.index, record.blob, record.fileName, { bars: record.bars, persist: false })
+    if (!ok) {
+      failed.push(record.fileName)
+      void deleteSlot(record.index).catch(() => {})
+    }
+  }
+  for (const record of restoreOrder(saved.pads)) {
+    if (!(await loadPadFile(record.index, record.blob, record.fileName, { persist: false }))) {
+      failed.push(record.fileName)
+      void deletePad(record.index).catch(() => {})
+    }
+  }
+  if (failed.length > 0) setState({ message: `Não foi possível restaurar: ${failed.join(', ')}` })
+}
+
 function stop() {
   padPlayers.forEach((player) => player?.stop())
   setState({ padPlaying: state.padPlaying.map(() => false) })
@@ -229,6 +331,7 @@ export const engine = {
       if (Tone.getContext().state !== 'running') return setState({ status: 'error' })
       if (chains.length === 0) for (let deck = 0; deck < DECK_COUNT; deck++) chains.push(createChain())
       setState({ status: 'ready' })
+      void restoreSaved()
     } catch {
       setState({ status: 'error' })
     }
@@ -254,29 +357,8 @@ export const engine = {
   },
 
   // Retorna se o arquivo foi carregado.
-  async loadSlot(slot: number, file: File): Promise<boolean> {
-    if (state.playing && state.decks.some((deck) => deck.current === slot)) return false
-    setState({ loading: replaceAt(state.loading, slot, true), message: null })
-    try {
-      const buffer = await decodeFile(file)
-      const player = new Tone.Player(buffer).connect(chains[deckOf(slot)].bus)
-      player.loop = true
-      players[slot]?.dispose()
-      players[slot] = player
-      if (referenceSlot === null) referenceSlot = slot
-      const slots = replaceAt(state.slots, slot, { fileName: file.name, duration: buffer.duration })
-      const bars = replaceAt(state.bars, slot, 4)
-      const bpm = deckBpm(slots, bars)
-      applyBpm(bpm)
-      setState({ slots, bars, bpm, loading: replaceAt(state.loading, slot, false) })
-      return true
-    } catch {
-      setState({
-        loading: replaceAt(state.loading, slot, false),
-        message: `Não foi possível ler o arquivo "${file.name}"`,
-      })
-      return false
-    }
+  loadSlot(slot: number, file: File): Promise<boolean> {
+    return loadSlotFile(slot, file, file.name, { persist: true })
   },
 
   // Preenche os slots vazios do deck em ordem, um arquivo por vez (o primeiro define o BPM da mesa).
@@ -289,34 +371,8 @@ export const engine = {
     if (summary) setState({ message: summary })
   },
 
-  async loadPad(pad: number, file: File): Promise<boolean> {
-    setState({ padLoading: replaceAt(state.padLoading, pad, true), message: null })
-    try {
-      const buffer = await decodeFile(file)
-      const player = new Tone.Player(buffer).toDestination()
-      // onstop dispara também para a fonte cortada por restart; só apaga o indicador se o pad parou de fato.
-      player.onstop = () => {
-        setTimeout(() => {
-          if (padPlayers[pad] === player && player.state === 'stopped') {
-            setState({ padPlaying: replaceAt(state.padPlaying, pad, false) })
-          }
-        }, 0)
-      }
-      padPlayers[pad]?.dispose()
-      padPlayers[pad] = player
-      setState({
-        pads: replaceAt(state.pads, pad, { fileName: file.name, duration: buffer.duration }),
-        padLoading: replaceAt(state.padLoading, pad, false),
-        padPlaying: replaceAt(state.padPlaying, pad, false),
-      })
-      return true
-    } catch {
-      setState({
-        padLoading: replaceAt(state.padLoading, pad, false),
-        message: `Não foi possível ler o arquivo "${file.name}"`,
-      })
-      return false
-    }
+  loadPad(pad: number, file: File): Promise<boolean> {
+    return loadPadFile(pad, file, file.name, { persist: true })
   },
 
   // Preenche os pads vazios em ordem (Q W E R A S D F), um arquivo por vez.
@@ -368,5 +424,35 @@ export const engine = {
     const bpm = deckBpm(state.slots, bars)
     applyBpm(bpm)
     setState({ bars, bpm })
+    const beat = state.slots[slot]
+    if (beat) persist(saveSlotBars(slot, value), beat.fileName)
+  },
+
+  // Para tudo, esvazia slots e pads, zera o BPM e apaga a mesa salva. A confirmação fica na UI.
+  async clearDeck(): Promise<void> {
+    stop()
+    players.forEach((player) => player?.dispose())
+    players.fill(null)
+    padPlayers.forEach((player) => player?.dispose())
+    padPlayers.fill(null)
+    referenceSlot = null
+    let decks = state.decks
+    for (let deck = 0; deck < DECK_COUNT; deck++) decks = effectsOff(decks, deck)
+    setState({
+      bpm: null,
+      decks: decks.map(() => idleDeck),
+      slots: Array(SLOT_COUNT).fill(null),
+      bars: Array(SLOT_COUNT).fill(4),
+      loading: Array(SLOT_COUNT).fill(false),
+      pads: Array(PAD_COUNT).fill(null),
+      padLoading: Array(PAD_COUNT).fill(false),
+      padPlaying: Array(PAD_COUNT).fill(false),
+      message: 'Mesa limpa',
+    })
+    try {
+      await clearAll()
+    } catch {
+      setState({ message: 'A mesa foi limpa, mas os áudios salvos não puderam ser apagados' })
+    }
   },
 }

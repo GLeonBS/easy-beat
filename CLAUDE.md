@@ -54,6 +54,7 @@ Princípios que atravessam módulos:
 - **Teclas por `event.code`** (posição física; funciona igual no ABNT2); ignorar `event.repeat`.
 - **Tudo na hora, sem quantização:** beats entram, trocam e saem no instante do comando, do início do loop; pads idem. A mesa não alinha decks — o tempo é do DJ. O Transport não roda; só guarda o BPM da mesa (`transport.bpm`).
 - **Áudio decodificado ao carregar, não ao tocar.**
+- **Mesa salva (`storage/`):** áudios dos slots (com compassos) e dos pads ficam no IndexedDB (Dexie `easybeat`) como `Blob`. Só `storage/` conhece o Dexie; o engine usa as funções do repositório. Salva ao carregar com sucesso e ao mudar compassos; restaura no fim de `engine.start()` na ordem de `savedAt` (o primeiro volta a definir o BPM), sem regravar. Falha no banco só gera aviso — nunca impede tocar. "Limpar mesa" apaga tudo.
 - **Trocas no mesmo instante:** use um único `now = Tone.now()` para o `stop` do beat anterior e o `start` do novo, para não haver silêncio nem sobreposição.
 
 Limitações aceitas na v1:
@@ -67,6 +68,6 @@ Efeitos: cadeia por deck criada em `engine.start()` — players do slot → bus 
 
 ## Restrições da v1
 
-- Sem login/usuário. Persistência mínima só em banco local; cada coisa nova a salvar entra por change própria.
+- Sem login/usuário. Persistência mínima só em banco local (hoje: áudios de slots e pads); cada coisa nova a salvar entra por change própria.
 - O usuário carrega os próprios áudios; arquivos de áudio ficam **fora do repositório** (`.gitignore`).
 - Não usar marcas de terceiros (Podpah, BASE) no nome ou identidade do produto.
