@@ -12,7 +12,7 @@
 
 ## 3. Publicação (ações externas, com confirmação do Leon)
 
-- [ ] 3.1 Ativar o GitHub Pages com origem GitHub Actions; verificar com `gh api repos/GLeonBS/easy-beat/pages` retornando `build_type: workflow`
+- [x] 3.1 Ativar o GitHub Pages com origem GitHub Actions; verificar com `gh api repos/GLeonBS/easy-beat/pages` retornando `build_type: workflow`
 - [ ] 3.2 Fazer push da `main` e acompanhar o workflow até concluir; verificar que `https://gleonbs.github.io/easy-beat/` abre a tela "Pressione Espaço para começar"
 
 ## Workflow follow-up
