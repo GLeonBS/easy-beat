@@ -3,6 +3,6 @@ import { StartScreen } from './StartScreen'
 import { useEngineState } from './useEngineState'
 
 export function App() {
-  const { status } = useEngineState()
-  return status === 'ready' ? <DeckScreen /> : <StartScreen status={status} />
+  const state = useEngineState()
+  return state.status === 'ready' ? <DeckScreen state={state} /> : <StartScreen status={state.status} />
 }

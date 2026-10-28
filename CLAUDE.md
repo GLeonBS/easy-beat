@@ -54,6 +54,7 @@ Princípios que atravessam módulos:
 - **Teclas por `event.code`** (posição física; funciona igual no ABNT2); ignorar `event.repeat`.
 - **Tudo quantizado pelo Transport:** trocas de beat agendadas para o próximo compasso (ou 4/8) — o som nunca "atravessa".
 - **Áudio decodificado ao carregar, não ao tocar.**
+- **Agendamento no Transport:** `scheduleOnce` recebe tempo do *Transport* (use ticks, ex. `'${n}i'`); `nextSubdivision()` devolve tempo do *contexto de áudio* — não misture. Trocas de som usam o `time` do callback; atualizações de tela vão por `Tone.getDraw().schedule(..., time)`.
 
 Limitações aceitas na v1:
 - Sem detecção de BPM: o usuário informa se o loop tem 4 ou 8 compassos; BPM vem da duração.
