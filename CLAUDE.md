@@ -20,8 +20,7 @@ EasyBeat: mesa de DJ no navegador para iniciantes — beats em loop trocados ao 
 - Sempre pensar na experiência de um iniciante usando o teclado.
 
 ### Plano de changes (ordem)
-1. `setup-stack` 2. `beat-slots` (+ `beats-imediatos`) 3. `sample-pads` 4. `fx-basicos` (absorveu `keyboard-shortcuts`) 5. `persistencia-minima`
-Se o prazo apertar, `persistencia-minima` é cortada.
+1. `setup-stack` 2. `beat-slots` (+ `beats-imediatos`) 3. `sample-pads` 4. `fx-basicos` (absorveu `keyboard-shortcuts`) 5. `persistencia-minima` 6. `publicar-github-pages`
 
 ## Stack
 
@@ -34,6 +33,8 @@ npm test                                      # vitest run
 npx vitest run src/input/keymap.test.ts -t "Espaço"   # um teste só
 npm run lint                                  # oxlint
 ```
+
+**Deploy:** `.github/workflows/deploy.yml` publica no GitHub Pages (https://gleonbs.github.io/easy-beat/) a cada push na `main`, depois de lint, testes e build — se algo falhar, nada é publicado. O Vite usa `base: './'` (caminhos relativos), então referências a arquivos de `public/` no `index.html` devem ser relativas (`./favicon.svg`), nunca `/...`. Push na `main` = publicar.
 
 ## Arquitetura
 

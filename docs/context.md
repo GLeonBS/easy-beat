@@ -19,10 +19,10 @@ Inspiração: o estilo de performance do DJ Mu540 no programa BASE — beats con
 - **Persistência mínima em banco local:** só registros essenciais. O que exatamente será salvo é definido em change própria.
 - O usuário carrega os próprios arquivos de áudio.
 - Ações principais acessíveis pelo teclado com atalhos padrão; o mouse também funciona.
+- Publicado no GitHub Pages (https://gleonbs.github.io/easy-beat/), só o app — sem áudios. (Trazido do backlog em 27/10/2026, change `publicar-github-pages`.)
 ### Fora da v1 (backlog)
 - Login, contas, perfis de usuário.
 - Persistência além do mínimo essencial.
-- Deploy público / hospedagem.
 - Mapeamento de teclas personalizável (candidato — já seria possível salvar no banco local).
 - Proteção de atalhos do navegador/sistema (Fullscreen + Keyboard Lock API).
 - Modo aprendizado (contagem de tempos e compassos, dicas contextuais).
