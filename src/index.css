@@ -100,9 +100,40 @@ button {
   margin: 16px 0 8px;
 }
 
+.deck-bar {
+  flex-wrap: wrap;
+}
+
 .deck-bar button {
   margin: 0;
   padding: 0.2rem 0.8rem;
+}
+
+.effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.effect[aria-pressed='true'] {
+  background: #4a3a6b;
+  outline: 2px solid #b388ff;
+}
+
+.key-legend {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  margin-top: 24px;
+  padding: 10px 12px;
+  border-top: 1px solid #333;
+  background: #141414;
+  font-size: 0.85rem;
+  color: #bbb;
 }
 
 .deck-title {

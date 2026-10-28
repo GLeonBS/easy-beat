@@ -20,8 +20,8 @@ EasyBeat: mesa de DJ no navegador para iniciantes — beats em loop trocados ao 
 - Sempre pensar na experiência de um iniciante usando o teclado.
 
 ### Plano de changes (ordem)
-1. `setup-stack` 2. `beat-slots` 3. `sample-pads` 4. `keyboard-shortcuts` 5. `fx-basicos` 6. `persistencia-minima`
-Ordem de corte se o prazo apertar: 5, depois 6.
+1. `setup-stack` 2. `beat-slots` (+ `beats-imediatos`) 3. `sample-pads` 4. `fx-basicos` (absorveu `keyboard-shortcuts`) 5. `persistencia-minima`
+Se o prazo apertar, `persistencia-minima` é cortada.
 
 ## Stack
 
@@ -37,13 +37,13 @@ npm run lint                                  # oxlint
 
 ## Arquitetura
 
-`src/main.tsx` instala o listener de teclado uma única vez (fora do React) e renderiza `ui/App`.
+`src/main.tsx` instala o teclado uma única vez (fora do React) e renderiza `ui/App`. `input/` concentra keydown, keyup (efeitos no modo segurar) e blur (solta efeitos segurados).
 
 ```
 src/
   engine/    Tone.js: relógio, slots de beat, pads, FX — não conhece React; expõe comandos e emite eventos
   commands/  ações nomeadas: switchBeat(n), triggerSample(n), toggleFx(x), stop()...
-  input/     teclado e mouse → commands (um único listener de keydown)
+  input/     teclado e mouse → commands; mapa de teclas e legenda em keymap.ts
   ui/        React; lê estado do engine via useSyncExternalStore
   storage/   repositório Dexie
 ```
@@ -61,7 +61,9 @@ Limitações aceitas na v1:
 - Sem time-stretch: o primeiro beat define o BPM; beats com BPM diferente geram aviso.
 - Áudio só inicia após gesto do usuário (tela "Pressione Espaço para começar").
 
-Mapa de teclas inicial: `1`–`8` slots de beat, `Q W E R` / `A S D F` pads, `Espaço` play/stop (final definido em `keyboard-shortcuts`).
+Mapa de teclas: `Espaço` tocar/parar, `1`–`8` beats (A: 1–4, B: 5–8), `Q W E R` / `A S D F` pads, `Z`/`X` filtro/eco A, `C`/`V` filtro/eco B, `9`/`0` modo manter/segurar A/B. Fonte única: `KEY_LEGEND` em `src/input/keymap.ts` (um teste garante que cada tecla da legenda tem comando).
+
+Efeitos: cadeia por deck criada em `engine.start()` — players do slot → bus → filtro → saída, e filtro → envio → eco → saída. O eco é um **envio**: desligar fecha a entrada, e o rabo do eco some sozinho. Pads não passam pelos efeitos.
 
 ## Restrições da v1
 

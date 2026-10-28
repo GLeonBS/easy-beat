@@ -1,6 +1,8 @@
 import { commands } from '../commands'
 import type { EngineState } from '../engine'
 import { DECK_COUNT, deckName, SLOTS_PER_DECK } from '../engine/tempo'
+import { EffectControls } from './EffectControls'
+import { KeyLegend } from './KeyLegend'
 import { LoadManyButton } from './LoadManyButton'
 import { PadsSection } from './PadsSection'
 import { formatBpm } from './format'
@@ -25,6 +27,7 @@ export function DeckScreen({ state }: { state: EngineState }) {
           <header className="deck-bar">
             <h2 className="deck-title">Deck {deckName(deck)}</h2>
             <LoadManyButton onFiles={(files) => void commands.loadDeck(deck, files)} />
+            <EffectControls deck={deck} state={state.decks[deck]} />
           </header>
           <div className="slot-grid">
             {Array.from({ length: SLOTS_PER_DECK }, (_, offset) => {
@@ -35,6 +38,7 @@ export function DeckScreen({ state }: { state: EngineState }) {
         </section>
       ))}
       <PadsSection state={state} />
+      <KeyLegend />
     </main>
   )
 }

@@ -1,4 +1,5 @@
 import * as Tone from 'tone'
+import { echoDelaySeconds, effectAfter, MAX_ECHO_SECONDS, type EffectAction, type EffectMode, type EffectName } from './effects'
 import {
   computeBpm,
   DECK_COUNT,
@@ -24,6 +25,9 @@ export interface BeatFile {
 export interface DeckState {
   current: number | null
   lastSelected: number | null
+  filter: boolean
+  echo: boolean
+  mode: EffectMode
 }
 
 export interface EngineState {
@@ -40,7 +44,7 @@ export interface EngineState {
   message: string | null
 }
 
-const idleDeck: DeckState = { current: null, lastSelected: null }
+const idleDeck: DeckState = { current: null, lastSelected: null, filter: false, echo: false, mode: 'manter' }
 
 let state: EngineState = {
   status: 'idle',
@@ -82,8 +86,62 @@ function deckBpm(slots: EngineState['slots'], bars: EngineState['bars']): number
   return beat ? computeBpm(beat.duration, bars[referenceSlot]) : null
 }
 
+// Cadeia de efeitos por deck: players → bus → filtro → saída, e filtro → envio → eco → saída.
+// O eco é um envio: fechar o envio deixa as repetições já no delay sumirem sozinhas.
+interface DeckChain {
+  bus: Tone.Gain
+  filter: Tone.Filter
+  echoSend: Tone.Gain
+  delay: Tone.FeedbackDelay
+}
+
+const FILTER_OPEN_HZ = 20000
+const FILTER_CLOSED_HZ = 400
+// Volume só da parte ecoada (o som original do deck não muda) e quanto cada repetição perde: ~3 repetições audíveis.
+const ECHO_LEVEL = 0.35
+const ECHO_FEEDBACK = 0.25
+const chains: DeckChain[] = []
+
+function createChain(): DeckChain {
+  const bus = new Tone.Gain()
+  const filter = new Tone.Filter(FILTER_OPEN_HZ, 'lowpass')
+  const echoSend = new Tone.Gain(0)
+  const delay = new Tone.FeedbackDelay({
+    delayTime: echoDelaySeconds(state.bpm),
+    feedback: ECHO_FEEDBACK,
+    wet: 1,
+    maxDelay: MAX_ECHO_SECONDS + 0.5,
+  })
+  bus.connect(filter)
+  filter.toDestination()
+  filter.connect(echoSend)
+  echoSend.connect(delay)
+  delay.toDestination()
+  return { bus, filter, echoSend, delay }
+}
+
 function applyBpm(bpm: number | null) {
   if (bpm !== null) Tone.getTransport().bpm.value = bpm
+  chains.forEach((chain) => (chain.delay.delayTime.value = echoDelaySeconds(bpm)))
+}
+
+// Liga/desliga um efeito com rampa curta, sem estalos.
+function setEffect(decks: readonly DeckState[], deck: number, effect: EffectName, on: boolean): DeckState[] {
+  const chain = chains[deck]
+  if (effect === 'filter') chain?.filter.frequency.rampTo(on ? FILTER_CLOSED_HZ : FILTER_OPEN_HZ, 0.05)
+  else chain?.echoSend.gain.rampTo(on ? ECHO_LEVEL : 0, 0.02)
+  return updateDeck(decks, deck, { [effect]: on })
+}
+
+function applyEffectAction(deck: number, effect: EffectName, action: EffectAction) {
+  if (state.status !== 'ready') return
+  const current = state.decks[deck]
+  const on = effectAfter(current[effect], current.mode, action)
+  if (on !== current[effect]) setState({ decks: setEffect(state.decks, deck, effect, on) })
+}
+
+function effectsOff(decks: readonly DeckState[], deck: number): DeckState[] {
+  return setEffect(setEffect(decks, deck, 'filter', false), deck, 'echo', false)
 }
 
 function decodeFile(file: File): Promise<AudioBuffer> {
@@ -168,7 +226,9 @@ export const engine = {
     setState({ status: 'starting' })
     try {
       await Tone.start()
-      setState({ status: Tone.getContext().state === 'running' ? 'ready' : 'error' })
+      if (Tone.getContext().state !== 'running') return setState({ status: 'error' })
+      if (chains.length === 0) for (let deck = 0; deck < DECK_COUNT; deck++) chains.push(createChain())
+      setState({ status: 'ready' })
     } catch {
       setState({ status: 'error' })
     }
@@ -199,7 +259,7 @@ export const engine = {
     setState({ loading: replaceAt(state.loading, slot, true), message: null })
     try {
       const buffer = await decodeFile(file)
-      const player = new Tone.Player(buffer).toDestination()
+      const player = new Tone.Player(buffer).connect(chains[deckOf(slot)].bus)
       player.loop = true
       players[slot]?.dispose()
       players[slot] = player
@@ -277,6 +337,30 @@ export const engine = {
     if (player.state === 'started') player.restart(now)
     else player.start(now)
     setState({ padPlaying: replaceAt(state.padPlaying, pad, true), message: null })
+  },
+
+  effectPress(deck: number, effect: EffectName) {
+    applyEffectAction(deck, effect, 'press')
+  },
+
+  effectRelease(deck: number, effect: EffectName) {
+    applyEffectAction(deck, effect, 'release')
+  },
+
+  // Troca manter/segurar e desliga os efeitos do deck, para não ficar nada ligado sem o usuário saber.
+  toggleEffectMode(deck: number) {
+    if (state.status !== 'ready') return
+    const mode: EffectMode = state.decks[deck].mode === 'manter' ? 'segurar' : 'manter'
+    setState({ decks: updateDeck(effectsOff(state.decks, deck), deck, { mode }) })
+  },
+
+  // Desliga os efeitos segurados (ex.: a janela perdeu o foco e o keyup não vai chegar).
+  releaseHeldEffects() {
+    let decks = state.decks
+    decks.forEach((deck, index) => {
+      if (deck.mode === 'segurar' && (deck.filter || deck.echo)) decks = effectsOff(decks, index)
+    })
+    if (decks !== state.decks) setState({ decks })
   },
 
   setBars(slot: number, value: Bars) {

@@ -27,7 +27,7 @@ src/
   engine/    motor de áudio (Tone.js): relógio, slots de beat, pads de sample, FX
              não conhece React; expõe comandos e emite eventos de estado
   commands/  ações nomeadas: switchBeat(n), triggerSample(n), toggleFx(x), stop()...
-  input/     teclado e mouse → commands (um único listener de keydown)
+  input/     teclado e mouse → commands (keydown, keyup e blur, num único módulo)
   ui/        React; lê estado do engine via useSyncExternalStore
   storage/   repositório Dexie (o que salvar é definido em change própria)
 ```
@@ -42,16 +42,18 @@ src/
 1. **Sem detecção automática de BPM.** O usuário informa quantos compassos o loop tem (4 ou 8); o BPM é calculado pela duração.
 2. **Sem time-stretch.** O primeiro beat define o BPM; beats com BPM diferente geram aviso. (Backlog.)
 3. **Áudio só inicia após gesto do usuário.** Tela inicial: "Pressione Espaço para começar".
-## Mapa de teclas padrão (proposta inicial)
-- `1`–`8`: slots de beat (troca na hora)
+## Mapa de teclas (v1)
+- `Espaço`: tocar/parar a mesa (corta os pads)
+- `1`–`8` (e teclado numérico): slots de beat — Deck A 1–4, Deck B 5–8 (entra/troca/sai na hora)
 - `Q W E R` / `A S D F`: pads de sample
-- `Espaço`: play/stop
-- Detalhes finais definidos na change `keyboard-shortcuts`.
+- `Z` / `X`: filtro / eco do Deck A; `C` / `V`: filtro / eco do Deck B
+- `9` / `0`: modo manter/segurar dos efeitos dos decks A / B
+- Fonte única: `KEY_LEGEND` em `src/input/keymap.ts`, exibida na legenda da mesa.
 ## Plano de changes (OpenSpec)
 1. `setup-stack` — projeto Vite/TS/React/Tone/Dexie + config do OpenSpec com esta stack
 2. `beat-slots` — carregar loops e trocar quantizado (núcleo)
 3. `sample-pads` — samples por cima
-4. `keyboard-shortcuts` — mapa padrão
+4. ~~`keyboard-shortcuts`~~ — absorvida: atalhos entraram em `beat-slots`/`sample-pads` e a legenda em `fx-basicos`
 5. `fx-basicos` — filtro e echo
 6. `persistencia-minima` — o que salvar
-**Ordem de corte se o prazo apertar:** 5, depois 6 (sem persistência = recarregar arquivos a cada sessão).
+**Se o prazo apertar:** corta-se a 6 (sem persistência = recarregar arquivos a cada sessão).
